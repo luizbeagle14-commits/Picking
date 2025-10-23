@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Atividade Prática EAD — Picking</title>
+<style>
+body{font-family:Inter,system-ui,Arial;background:#f6f8fb;margin:0;padding:20px;color:#102a43}
+h1{text-align:center;font-size:24px;margin-bottom:4px}
+.subtitle{text-align:center;font-size:14px;color:#475569;margin-bottom:12px}
+.container{max-width:1200px;margin:auto}
+.panel{background:#fff;border-radius:10px;padding:16px;box-shadow:0 6px 18px rgba(16,42,67,0.06);margin-bottom:18px}
+.warehouse{display:grid;grid-template-columns:repeat(8,70px);gap:8px;padding:8px;border-radius:8px;justify-content:center}
+.cell{height:70px;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;border:1px solid #e2e8f0;cursor:pointer;transition:0.12s}
+.cell.pick{border:2px solid #0b69ff;background:#fff3bf}
+.zoneA{background:#e0f2fe}
+.zoneB{background:#dcfce7}
+.zoneC{background:#fef9c3}
+.zoneD{background:#ffe4e6}
+.sku{font-weight:700}
+button{background:#0b69ff;color:#fff;border:none;padding:10px 14px;border-radius:8px;cursor:pointer}
+button.secondary{background:#e6eefc;color:#0b69ff}
+.stats{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+.stat{font-size:14px;font-weight:600}
+.orders{display:flex;flex-direction:column;gap:8px;align-items:center}
+.order{padding:8px;border-radius:8px;border:1px dashed #cbd5e1;background:#fff;width:320px;text-align:left}
+.order strong{display:block;margin-bottom:6px}
+.order .done{text-decoration:line-through;color:#94a3b8}
+.explain{background:#fff;padding:10px;border-radius:8px;margin-top:12px}
+#pickedList{font-size:13px;background:#fff;padding:10px;border-radius:8px;max-height:180px;overflow:auto}
+input[type=text]{padding:6px;border:1px solid #cbd5e1;border-radius:6px}
+.references{font-size:11px;color:#64748b;margin-top:30px;text-align:center}
+#rankingPanel{display:none}
+@media(max-width:980px){.warehouse{grid-template-columns:repeat(4,70px)}.order{width:90%}}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Atividade Prática EAD — Picking</h1>
+  <div class="subtitle">Prof. Luiz Eduardo Peixoto Borges</div>
+
+  <div class="panel">
+    <label><strong>Nome do Operador:</strong> <input type="text" id="alunoNome" placeholder="Digite seu nome" style="width:260px"></label>
+  </div>
+
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;align-items:center">
+      <div>
+        <strong>Escolha a estratégia:</strong><br>
+        <label><input type="radio" name="strategy" value="discrete" checked> Discreto</label>
+        <label><input type="radio" name="strategy" value="zone"> Por Zona</label>
+        <label><input type="radio" name="strategy" value="batch"> Por Lote</label>
+        <label><input type="radio" name="strategy" value="wave"> Por Onda</label>
+      </div>
+      <div>
+        <button id="startBtn">▶ Iniciar Atividade</button>
+        <button id="prevBtn" class="secondary" disabled>◀ Pedido Anterior</button>
+        <button id="nextBtn" class="secondary" disabled>▶ Próximo Pedido</button>
+        <button id="finishBtn" class="secondary" disabled>✅ Finalizar</button>
+        <button id="rankingBtn" class="secondary">🏆 Ver Ranking</button>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat" id="timer">⏱ Tempo: 0s</div>
+      <div class="stat" id="moves">📦 Movimentações: 0</div>
+      <div class="stat" id="score">🏁 Pontuação: 0</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Regras da Estratégia</h3>
+    <div id="rulesText" style="font-size:14px;color:#334155">
+      • <b>Discreto:</b> um pedido por vez, ideal para precisão.<br>
+      • <b>Por Zona:</b> operadores trabalham apenas em sua cor de zona (A azul, B verde, C amarela, D rosa).<br>
+      • <b>Por Lote:</b> agrupa pedidos com itens iguais para reduzir deslocamentos.<br>
+      • <b>Por Onda:</b> processa grupos de pedidos durante janelas de tempo.
+    </div>
+  </div>
+
+  <div class="panel" style="display:flex;flex-wrap:wrap;gap:20px;justify-content:space-around;align-items:flex-start">
+    <div>
+      <h3>Pedidos</h3>
+      <div id="ordersList" class="orders"></div>
+    </div>
+    <div>
+      <h3>Produtos Separados</h3>
+      <div id="pickedList">Nenhum item separado ainda.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Armazém (clique nos produtos para separar)</h3>
+    <div id="warehouseGrid" class="warehouse"></div>
+  </div>
+
+  <div id="feedback" class="explain"></div>
+
+  <div id="rankingPanel" class="panel">
+    <h3>🏆 Ranking Local (Top 10)</h3>
+    <ul id="rankingList"></ul>
+  </div>
+
+  <div id="history" class="panel">
+    <h3>Histórico de Tentativas</h3>
+    <ul id="historyList"></ul>
+  </div>
+
+  <div class="references">
+    <p><strong>Referências:</strong><br>
+    Material do módulo: "Recebimento e Expedição" (PPT do curso). — Mecalux — Kardex — NetSuite.</p>
+  </div>
+</div>
+
+<script>
+/* ===================== CONFIG GLOBAL ===================== */
+// URL de destino para resultados globais (futuro servidor / planilha)
+const GLOBAL_RESULTS_URL = ""; 
+// Quando hospedar, insira algo como: 
+// const GLOBAL_RESULTS_URL = "https://seuservidor.com/api/picking-result";
+
+/* ===================== DADOS ===================== */
+const SKUS_ORIG=[
+{id:'A1',sku:'X100',q:10,zone:'A'},{id:'A2',sku:'X101',q:8,zone:'A'},
+{id:'B1',sku:'Y200',q:20,zone:'B'},{id:'B2',sku:'Y201',q:7,zone:'B'},
+{id:'C1',sku:'Z300',q:15,zone:'C'},{id:'C2',sku:'Z301',q:4,zone:'C'},
+{id:'D1',sku:'W400',q:3,zone:'D'},{id:'D2',sku:'W401',q:16,zone:'D'}
+];
+let SKUS=[],orders=[],pickedTotal={},pickedPerOrder={},strategy='discrete';
+let moves=0,score=0,time=0,timerInt=null,activityStarted=false,orderIndex=0;
+let currentZone='A';
+
+/* ===================== ELEMENTOS ===================== */
+const warehouse=document.getElementById('warehouseGrid');
+const ordersList=document.getElementById('ordersList');
+const feedback=document.getElementById('feedback');
+const pickedList=document.getElementById('pickedList');
+const timerBox=document.getElementById('timer');
+const movesBox=document.getElementById('moves');
+const scoreBox=document.getElementById('score');
+const prevBtn=document.getElementById('prevBtn');
+const nextBtn=document.getElementById('nextBtn');
+const finishBtn=document.getElementById('finishBtn');
+const rankingBtn=document.getElementById('rankingBtn');
+const rankingPanel=document.getElementById('rankingPanel');
+const rankingList=document.getElementById('rankingList');
+
+/* ===================== FUNÇÕES BASE ===================== */
+function cloneSkus(){ SKUS = SKUS_ORIG.map(s=>({...s})); }
+function renderWarehouse(){
+ warehouse.innerHTML='';
+ SKUS.forEach(c=>{
+  const div=document.createElement('div');
+  div.className='cell zone'+c.zone;
+  div.innerHTML=`<div class="sku">${c.sku}</div><div>${c.q}u</div>`;
+  div.dataset.sku=c.sku;
+  div.dataset.zone=c.zone;
+  div.addEventListener('click',()=>onPick(c,div));
+  warehouse.appendChild(div);
+ });
+}
+function randomOrders(){
+ orders=[];const pool=SKUS.map(s=>s.sku);
+ for(let i=0;i<4;i++){
+   const lines=Math.floor(Math.random()*2)+2;
+   const items={};
+   for(let j=0;j<lines;j++){
+     const s=pool[Math.floor(Math.random()*pool.length)];
+     const q=Math.floor(Math.random()*3)+1;
+     items[s]=(items[s]||0)+q;
+   }
+   orders.push({id:'P'+(i+1),items});
+ }
+ orderIndex=0;pickedTotal={};pickedPerOrder={};for(let i=0;i<orders.length;i++)pickedPerOrder[i]={};
+ renderOrders();updatePickedList();
+}
+function renderOrders(){
+ ordersList.innerHTML='';
+ const o=orders[orderIndex];if(!o)return;
+ const div=document.createElement('div');div.className='order';
+ div.innerHTML=`<strong>${o.id}</strong>`+Object.entries(o.items).map(([s,q])=>{
+   const done=(pickedPerOrder[orderIndex][s]||0)>=q?'done':'';
+   return `<div class="${done}" data-sku="${s}">${s} - ${q}u</div>`;
+ }).join('');
+ ordersList.appendChild(div);
+ prevBtn.disabled=(orderIndex===0);
+ nextBtn.disabled=(orderIndex===orders.length-1);
+}
+function updatePickedList(){
+ if(Object.keys(pickedTotal).length===0){pickedList.textContent='Nenhum item separado ainda.';return;}
+ pickedList.innerHTML=Object.entries(pickedTotal).map(([s,q])=>`${s}: ${q}u`).join('<br>');
+}
+function updateStats(){
+ movesBox.textContent='📦 Movimentações: '+moves;
+ scoreBox.textContent='🏁 Pontuação: '+score;
+ timerBox.textContent='⏱ Tempo: '+time+'s';
+}
+
+/* ===================== AÇÕES ===================== */
+function onPick(cell){
+ if(!activityStarted){alert('Inicie a atividade primeiro.');return;}
+ const sku=cell.sku;if(!sku)return;
+ const s=SKUS.find(x=>x.sku===sku);
+ if(!s||s.q<=0){alert('Sem estoque.');return;}
+ if(strategy==='zone'&&s.zone!==currentZone){alert(`Você está na zona ${currentZone}. Só pode coletar itens dessa cor.`);return;}
+ const need=(orders[orderIndex].items[sku]||0);
+ const have=(pickedPerOrder[orderIndex][sku]||0);
+ if(have>=need){alert('Item já completo neste pedido.');return;}
+ s.q--;moves++;pickedTotal[sku]=(pickedTotal[sku]||0)+1;
+ pickedPerOrder[orderIndex][sku]=(pickedPerOrder[orderIndex][sku]||0)+1;
+ renderWarehouse();renderOrders();updatePickedList();updateStats();
+}
+
+/* ===================== INÍCIO E FINAL ===================== */
+function startActivity(){
+ if(activityStarted)return;
+ const nome=document.getElementById('alunoNome').value.trim();
+ if(!nome){alert('Digite seu nome antes de iniciar.');return;}
+ activityStarted=true;moves=0;score=0;time=0;cloneSkus();randomOrders();renderWarehouse();updateStats();
+ pickedList.textContent='Nenhum item separado ainda.';finishBtn.disabled=false;prevBtn.disabled=false;nextBtn.disabled=false;
+ if(strategy==='zone'){let z=prompt('Informe sua zona (A,B,C,D):','A');currentZone=(z||'A').toUpperCase();}
+ timerInt=setInterval(()=>{time++;updateStats();},1000);
+ feedback.innerHTML=`Atividade iniciada — Operador: <b>${nome}</b>`;
+}
+function finishActivity(){
+ if(!activityStarted)return;
+ clearInterval(timerInt);
+ let correct=0,total=0;
+ orders.forEach((o,i)=>{for(const[k,q]of Object.entries(o.items)){total+=q;correct+=Math.min(pickedPerOrder[i][k]||0,q);}});
+ score=Math.max(0,correct*10);
+ updateStats();
+ const nome=document.getElementById('alunoNome').value.trim();
+ const result={data:new Date().toLocaleString(),operador:nome,estrategia:strategy,tempo:time,movimentos:moves,pontuacao:score};
+ feedback.innerHTML=`<strong>Atividade concluída!</strong><br>Operador: ${nome}<br>Estratégia: ${strategy.toUpperCase()}<br>Itens corretos: ${correct}/${total}<br>Tempo: ${time}s<br>Movimentações: ${moves}<br>Pontuação: ${score}`;
+ saveResult(result);activityStarted=false;
+}
+
+/* ===================== SALVAR LOCAL + ENVIO GLOBAL ===================== */
+function saveResult(r){
+ const results=JSON.parse(localStorage.getItem('pickingResults')||'[]');
+ results.push(r);localStorage.setItem('pickingResults',JSON.stringify(results.slice(-50)));
+ loadHistory();updateRanking();
+ if(GLOBAL_RESULTS_URL){ // envia se configurado
+   fetch(GLOBAL_RESULTS_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(r)})
+   .then(()=>console.log("Resultado global enviado."))
+   .catch(err=>console.warn("Falha no envio global:",err));
+ }
+}
+
+/* ===================== HISTÓRICO & RANKING ===================== */
+function loadHistory(){
+ const results=JSON.parse(localStorage.getItem('pickingResults')||'[]');
+ const list=document.getElementById('historyList');list.innerHTML='';
+ results.slice().reverse().forEach(r=>{
+   const li=document.createElement('li');
+   li.textContent=`${r.data} — ${r.operador} — ${r.estrategia.toUpperCase()} | ${r.pontuacao} pts | ${r.tempo}s`;
+   list.appendChild(li);
+ });
+}
+function updateRanking(){
+ const results=JSON.parse(localStorage.getItem('pickingResults')||'[]');
+ const sorted=[...results].sort((a,b)=>b.pontuacao-a.pontuacao||a.tempo-b.tempo).slice(0,10);
+ rankingList.innerHTML='';
+ sorted.forEach((r,i)=>{
+   const li=document.createElement('li');
+   li.textContent=`${i+1}º — ${r.operador} — ${r.estrategia.toUpperCase()} — ${r.pontuacao} pts — ${r.tempo}s — ${r.data}`;
+   rankingList.appendChild(li);
+ });
+}
+
+/* ===================== NAVEGAÇÃO & EVENTOS ===================== */
+prevBtn.addEventListener('click',()=>{if(orderIndex>0){orderIndex--;renderOrders();}});
+nextBtn.addEventListener('click',()=>{if(orderIndex<orders.length-1){orderIndex++;renderOrders();}});
+document.getElementById('startBtn').addEventListener('click',startActivity);
+finishBtn.addEventListener('click',finishActivity);
+rankingBtn.addEventListener('click',()=>{rankingPanel.style.display=rankingPanel.style.display==='none'?'block':'none';updateRanking();});
+document.getElementsByName('strategy').forEach(r=>r.addEventListener('change',e=>{
+ strategy=e.target.value;cloneSkus();renderWarehouse();
+}));
+
+/* ===================== INIT ===================== */
+cloneSkus();randomOrders();renderWarehouse();loadHistory();updateRanking();
+</script>
+</body>
+</html>
+
+
