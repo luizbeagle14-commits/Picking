@@ -113,7 +113,7 @@ input[type=text]{padding:6px;border:1px solid #cbd5e1;border-radius:6px}
 <script>
 /* ===================== CONFIG GLOBAL ===================== */
 // URL de destino para resultados globais (futuro servidor / planilha)
-const GLOBAL_RESULTS_URL = ""; 
+const GLOBAL_RESULTS_URL = "https://luizbeagle14-commits.github.io/Picking/"; 
 // Quando hospedar, insira algo como: 
 // const GLOBAL_RESULTS_URL = "https://seuservidor.com/api/picking-result";
 
